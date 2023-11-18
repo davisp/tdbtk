@@ -1,3 +1,6 @@
+// This file is part of tdbtk released under the MIT license.
+// Copyright (c) 2023 TileDB, Inc.
+
 use anyhow::Result;
 
 use crate::filters::compressors::Compressor;
