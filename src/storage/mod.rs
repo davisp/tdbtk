@@ -5,6 +5,11 @@ use binrw::binrw;
 
 use crate::filters::FilterType;
 
+mod schema;
+
+pub const CURRENT_FORMAT_VERSION: u32 = 21;
+pub const GENERIC_TILE_HEADER_SIZE: u64 = 34;
+
 fn is_compression_filter(ftype: FilterType) -> bool {
     matches!(
         ftype as FilterType,
@@ -46,7 +51,7 @@ fn is_no_config_filter(ftype: FilterType) -> bool {
 #[binrw]
 #[brw(little)]
 #[br(import { filter_type: FilterType })]
-enum FilterConfig {
+pub enum FilterConfig {
     #[br(pre_assert(is_compression_filter(filter_type)))]
     Compression {
         #[br(map = |ftype: u8| ftype.into())]
@@ -83,9 +88,10 @@ enum FilterConfig {
 #[derive(Debug, Default)]
 #[binrw]
 #[brw(little)]
-struct Filter {
+pub struct Filter {
     #[br(map = |ftype: u8| ftype.into())]
     #[bw(map = |ftype: &FilterType| *ftype as u8)]
+    #[brw(assert(!matches!(filter_type, FilterType::Invalid)))]
     filter_type: FilterType,
     metadata_len: u32,
 
@@ -93,10 +99,20 @@ struct Filter {
     config: FilterConfig,
 }
 
+impl Filter {
+    pub fn filter_type(&self) -> FilterType {
+        self.filter_type
+    }
+
+    pub fn config(&self) -> &FilterConfig {
+        &self.config
+    }
+}
+
 #[derive(Debug)]
 #[binrw]
 #[brw(little)]
-struct FilterPipeline {
+pub struct FilterList {
     max_chunk_size: u32,
     num_filters: u32,
 
@@ -104,10 +120,71 @@ struct FilterPipeline {
     filters: Vec<Filter>,
 }
 
+impl FilterList {
+    pub fn filters(&self) -> &[Filter] {
+        &self.filters
+    }
+}
+
+#[derive(Debug, Default)]
+#[binrw]
+#[brw(little)]
+pub struct Chunk {
+    pub original_size: u32,
+    data_size: u32,
+    metadata_size: u32,
+
+    #[br(count(metadata_size))]
+    pub metadata: Vec<u8>,
+
+    #[br(count(data_size))]
+    pub data: Vec<u8>,
+}
+
 #[derive(Debug)]
 #[binrw]
 #[brw(little)]
-struct GenericTileHeader {
+pub struct ChunkedData {
+    pub num_chunks: u64,
+
+    #[br(count(num_chunks))]
+    pub chunks: Vec<Chunk>,
+}
+
+impl ChunkedData {
+    pub fn new(num_chunks: u64) -> Self {
+        let mut chunks = Vec::new();
+        chunks.resize_with(num_chunks as usize, Chunk::default);
+        ChunkedData { num_chunks, chunks }
+    }
+}
+
+#[derive(Debug)]
+#[binrw]
+#[brw(little)]
+pub struct CompressionChunkInfo {
+    pub uncompressed_size: u32,
+    pub compressed_size: u32,
+}
+
+#[derive(Debug)]
+#[binrw]
+#[brw(little)]
+pub struct CompressionChunks {
+    num_metadata_parts: u32,
+    num_data_parts: u32,
+
+    #[br(count(num_metadata_parts))]
+    pub metadata_parts: Vec<CompressionChunkInfo>,
+
+    #[br(count(num_data_parts))]
+    pub data_parts: Vec<CompressionChunkInfo>,
+}
+
+#[derive(Debug)]
+#[binrw]
+#[brw(little)]
+pub struct GenericTileHeader {
     version: u32,
     persisted_size: u64,
     tile_size: u64,
@@ -120,18 +197,53 @@ struct GenericTileHeader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::filters::FilterChain;
     use binrw::io::Cursor;
     use binrw::BinRead;
-    use util::read_test_file;
+    use util::read_test_file_at;
 
     #[test]
     fn basic_read() {
-        let data = read_test_file("resources/schema/schema_1".to_string());
-        let mut reader = Cursor::new(data);
+        let header_data = read_test_file_at(
+            "resources/schema/schema_1".to_string(),
+            GENERIC_TILE_HEADER_SIZE,
+            0,
+        );
+        let mut reader = Cursor::new(header_data);
         let header = GenericTileHeader::read(&mut reader).unwrap();
         println!("{:?}", header);
 
-        let pipeline = FilterPipeline::read(&mut reader).unwrap();
+        let pipeline_data = read_test_file_at(
+            "resources/schema/schema_1".to_string(),
+            header.filter_pipeline_size as u64,
+            GENERIC_TILE_HEADER_SIZE,
+        );
+        let mut reader = Cursor::new(pipeline_data);
+        let pipeline = FilterList::read(&mut reader).unwrap();
         println!("{:?}", pipeline);
+
+        let chain = FilterChain::from_list(&pipeline);
+
+        let disk_data = read_test_file_at(
+            "resources/schema/schema_1".to_string(),
+            header.persisted_size,
+            GENERIC_TILE_HEADER_SIZE + header.filter_pipeline_size as u64,
+        );
+
+        let mut reader = Cursor::new(disk_data);
+        let mut chunks = ChunkedData::read(&mut reader).unwrap();
+
+        let data = chain.unfilter_chunks(&mut chunks).unwrap_or_else(|err| {
+            panic!("Failed to unfilter tile data: {:?}", err);
+        });
+
+        println!("Data! {:?}", data);
+
+        // let mut unfiltered = Vec::new();
+        // chain
+        //     .unfilter(&mut tile_data, &mut unfiltered)
+        //     .unwrap_or_else(|err| {
+        //         panic!("Failed to unfilter tile data: {:?}", err);
+        //     });
     }
 }

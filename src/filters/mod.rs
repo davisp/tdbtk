@@ -1,10 +1,24 @@
 // This file is part of tdbtk released under the MIT license.
 // Copyright (c) 2023 TileDB, Inc.
 
+mod gzip;
+
 use anyhow::Result;
 
-pub mod compression;
-mod compressors;
+use crate::storage;
+
+pub trait Filter {
+    // fn filter(
+    //     &self,
+    //     input: &mut storage::Chunk,
+    //     output: &mut storage::Chunk,
+    // ) -> Result<()>;
+    fn unfilter(
+        &self,
+        input: &mut storage::Chunk,
+        output: &mut storage::Chunk,
+    ) -> Result<()>;
+}
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -30,7 +44,7 @@ pub enum FilterType {
     Deprecated = 17,
     WebP = 18,
     Delta = 19,
-    InvalidFilterType = 255,
+    Invalid = 255,
 }
 
 impl From<u8> for FilterType {
@@ -56,18 +70,84 @@ impl From<u8> for FilterType {
             17 => FilterType::Deprecated,
             18 => FilterType::WebP,
             19 => FilterType::Delta,
-            _ => return FilterType::InvalidFilterType,
+            _ => FilterType::Invalid,
         }
     }
 }
 
-pub trait Filter {
-    type InputItem;
-    type OutputItem;
+fn create_filter(filter: &storage::Filter) -> Box<dyn Filter> {
+    match filter.filter_type() {
+        FilterType::GZip => {
+            Box::from(gzip::GZipFilter::from_config(filter.config()))
+        }
+        ftype => panic!("Unsupported filter type: {:?}", ftype),
+    }
+}
 
-    fn filter(&self, input: &[Self::InputItem]) -> Vec<Self::OutputItem>;
-    fn unfilter(
+pub struct FilterChain {
+    filter: Box<dyn Filter>,
+    next: Option<Box<FilterChain>>,
+}
+
+impl FilterChain {
+    pub fn from_list(list: &storage::FilterList) -> Box<Self> {
+        let chain = list.filters().iter().rev().fold(None, |acc, filter| {
+            Some(Box::from(FilterChain {
+                filter: create_filter(filter),
+                next: acc,
+            }))
+        });
+        chain.unwrap_or_else(|| {
+            panic!("Failed to create filter chain.");
+        })
+    }
+}
+
+impl FilterChain {
+    pub fn unfilter(
         &self,
-        input: &[Self::OutputItem],
-    ) -> Result<Vec<Self::InputItem>>;
+        input: &mut storage::Chunk,
+        output: &mut storage::Chunk,
+    ) -> Result<()> {
+        match &self.next {
+            None => self.filter.unfilter(input, output)?,
+            Some(next_filter) => {
+                next_filter.unfilter(input, output)?;
+                std::mem::swap(output, input);
+                self.filter.unfilter(input, output)?;
+            }
+        };
+        Ok(())
+    }
+
+    pub fn unfilter_chunks(
+        &self,
+        chunks: &mut storage::ChunkedData,
+    ) -> Result<Vec<u8>> {
+        let mut scratch = storage::ChunkedData::new(chunks.num_chunks);
+        for (input, output) in
+            chunks.chunks.iter_mut().zip(scratch.chunks.iter_mut())
+        {
+            self.unfilter(input, output)?
+        }
+
+        let output_size = chunks
+            .chunks
+            .iter()
+            .map(|chunk| chunk.original_size as usize)
+            .sum();
+
+        let mut output = vec![0; output_size];
+
+        let mut output_offset = 0;
+        for (chunk_in, chunk_out) in
+            chunks.chunks.iter().zip(scratch.chunks.iter())
+        {
+            let output_end = output_offset + chunk_in.original_size as usize;
+            output[output_offset..output_end].copy_from_slice(&chunk_out.data);
+            output_offset += chunk_in.original_size as usize;
+        }
+
+        Ok(output)
+    }
 }
