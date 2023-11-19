@@ -50,8 +50,10 @@ struct Domain {
 
     num_dimensions: u32,
 
-    #[br(count(num_dimensions))]
-    #[br(args { version, data_type })]
+    #[br(count = num_dimensions, args {
+        version: version,
+        data_type: data_type
+    })]
     dimensions: Vec<Dimension>,
 }
 
