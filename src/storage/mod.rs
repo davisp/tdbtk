@@ -47,7 +47,7 @@ fn is_no_config_filter(ftype: FilterType) -> bool {
         || is_webp_filter(ftype))
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 #[binrw]
 #[brw(little)]
 #[br(import { filter_type: FilterType })]
@@ -85,7 +85,7 @@ pub enum FilterConfig {
     None,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 #[binrw]
 #[brw(little)]
 pub struct Filter {
@@ -109,7 +109,7 @@ impl Filter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[binrw]
 #[brw(little)]
 pub struct FilterList {
@@ -237,7 +237,12 @@ mod tests {
             panic!("Failed to unfilter tile data: {:?}", err);
         });
 
-        println!("Data! {:?}", data);
+        let mut reader = Cursor::new(data);
+        let s = schema::ArraySchema::read(&mut reader).unwrap_or_else(|err| {
+            panic!("Failed to read schema: {:?}", err);
+        });
+
+        println!("Schema! {:?}", s);
 
         // let mut unfiltered = Vec::new();
         // chain

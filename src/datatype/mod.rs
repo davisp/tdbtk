@@ -1,6 +1,8 @@
 // This file is part of tdbtk released under the MIT license.
 // Copyright (c) 2023 TileDB, Inc.
 
+use std::mem::size_of;
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Default)]
 pub enum DataType {
@@ -51,6 +53,54 @@ pub enum DataType {
 }
 
 impl DataType {
+    pub fn size(&self) -> usize {
+        match self {
+            DataType::Int32 => size_of::<i32>(),
+            DataType::Int64 => size_of::<i64>(),
+            DataType::Float32 => size_of::<f32>(),
+            DataType::Float64 => size_of::<f64>(),
+            DataType::Char => size_of::<char>(),
+            DataType::Int8 => size_of::<i8>(),
+            DataType::Uint8 => size_of::<u8>(),
+            DataType::Int16 => size_of::<i16>(),
+            DataType::Uint16 => size_of::<u16>(),
+            DataType::Uint32 => size_of::<u32>(),
+            DataType::Uint64 => size_of::<u64>(),
+            DataType::StringAscii => size_of::<char>(),
+            DataType::StringUtf8 => size_of::<u8>(),
+            DataType::StringUtf16 => size_of::<u16>(),
+            DataType::StringUtf32 => size_of::<u32>(),
+            DataType::StringUcs2 => size_of::<u16>(),
+            DataType::StringUcs4 => size_of::<u32>(),
+            DataType::Any => size_of::<u8>(),
+            DataType::DatetimeYear => size_of::<u64>(),
+            DataType::DatetimeMonth => size_of::<u64>(),
+            DataType::DatetimeWeek => size_of::<u64>(),
+            DataType::DatetimeDay => size_of::<u64>(),
+            DataType::DatetimeHour => size_of::<u64>(),
+            DataType::DatetimeMin => size_of::<u64>(),
+            DataType::DatetimeSec => size_of::<u64>(),
+            DataType::DatetimeMSec => size_of::<u64>(),
+            DataType::DatetimeUSec => size_of::<u64>(),
+            DataType::DatetimeNSec => size_of::<u64>(),
+            DataType::DatetimePSec => size_of::<u64>(),
+            DataType::DatetimeFSec => size_of::<u64>(),
+            DataType::DatetimeASec => size_of::<u64>(),
+            DataType::TimeHour => size_of::<u64>(),
+            DataType::TimeMin => size_of::<u64>(),
+            DataType::TimeSec => size_of::<u64>(),
+            DataType::TimeMSec => size_of::<u64>(),
+            DataType::TimeUSec => size_of::<u64>(),
+            DataType::TimeNSec => size_of::<u64>(),
+            DataType::TimePSec => size_of::<u64>(),
+            DataType::TimeFSec => size_of::<u64>(),
+            DataType::TimeASec => size_of::<u64>(),
+            DataType::Blob => size_of::<u8>(),
+            DataType::Bool => size_of::<u8>(),
+            DataType::Invalid => 0,
+        }
+    }
+
     pub fn is_string_type(&self) -> bool {
         matches!(
             self,

@@ -44,3 +44,24 @@ impl From<u8> for Layout {
         }
     }
 }
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default)]
+pub enum DataOrder {
+    #[default]
+    Unordered = 0,
+    Increasing = 1,
+    Decreasing = 2,
+    Invalid = 255,
+}
+
+impl From<u8> for DataOrder {
+    fn from(orig: u8) -> Self {
+        match orig {
+            0 => DataOrder::Unordered,
+            1 => DataOrder::Increasing,
+            2 => DataOrder::Decreasing,
+            _ => DataOrder::Invalid,
+        }
+    }
+}
