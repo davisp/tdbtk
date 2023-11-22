@@ -11,6 +11,7 @@ use crate::io::service::VFSService;
 use crate::io::uri;
 use crate::io::{FSEntry, FSEntryType};
 
+#[derive(Default)]
 pub struct PosixVFSService {}
 
 impl PosixVFSService {

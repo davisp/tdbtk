@@ -198,39 +198,44 @@ pub struct GenericTileHeader {
 mod tests {
     use super::*;
     use crate::filters::FilterChain;
-    use crate::io::PosixVFSService;
+    use crate::io::service::VFSService;
+    use crate::io::{uri, PosixVFSService};
+    use anyhow::Result;
     use binrw::io::Cursor;
     use binrw::BinRead;
-    use util::read_test_file_at;
 
     #[test]
-    fn basic_read() {
-        let io = PosixVFSService::new();
-        let header_data = io.read_file(
-            "resources/schema/schema_1".to_string(),
+    fn basic_read() -> Result<()> {
+        let vfs = PosixVFSService::default();
+        let mut header_data = vec![0; GENERIC_TILE_HEADER_SIZE as usize];
+        vfs.file_read(
+            &uri::URI::from_string("resources/schema/schema_1")?,
             GENERIC_TILE_HEADER_SIZE,
             0,
-        );
+            &mut header_data,
+        )?;
         let mut reader = Cursor::new(header_data);
         let header = GenericTileHeader::read(&mut reader).unwrap();
         println!("{:?}", header);
 
-        let pipeline_data = read_test_file_at(
-            "resources/schema/schema_1".to_string(),
+        let mut pipeline_data = vec![0; header.filter_pipeline_size as usize];
+        vfs.file_read(
+            &uri::URI::from_string("resources/schema/schema_1")?,
             header.filter_pipeline_size as u64,
             GENERIC_TILE_HEADER_SIZE,
-        );
+            &mut pipeline_data,
+        )?;
         let mut reader = Cursor::new(pipeline_data);
         let pipeline = FilterList::read(&mut reader).unwrap();
         println!("{:?}", pipeline);
 
         let chain = FilterChain::from_list(&pipeline);
 
-        let disk_data = read_test_file_at(
-            "resources/schema/schema_1".to_string(),
+        let disk_data = vfs.file_read_vec(
+            &uri::URI::from_string("resources/schema/schema_1")?,
             header.persisted_size,
             GENERIC_TILE_HEADER_SIZE + header.filter_pipeline_size as u64,
-        );
+        )?;
 
         let mut reader = Cursor::new(disk_data);
         let mut chunks = ChunkedData::read(&mut reader).unwrap();
@@ -252,5 +257,7 @@ mod tests {
         //     .unwrap_or_else(|err| {
         //         panic!("Failed to unfilter tile data: {:?}", err);
         //     });
+
+        Ok(())
     }
 }

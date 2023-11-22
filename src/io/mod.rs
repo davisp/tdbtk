@@ -5,7 +5,8 @@ pub mod posix;
 pub mod service;
 pub mod uri;
 
-pub use posix::PosixVFSService;
+pub use self::posix::PosixVFSService;
+pub use self::service::VFSService;
 
 #[derive(Clone)]
 pub enum FSEntryType {
@@ -31,11 +32,11 @@ impl FSEntry {
     }
 
     pub fn uri(&self) -> uri::URI {
-        self.uri
+        self.uri.clone()
     }
 
     pub fn entry_type(&self) -> FSEntryType {
-        self.entry_type
+        self.entry_type.clone()
     }
 
     pub fn size(&self) -> u64 {

@@ -3,6 +3,8 @@
 
 use std::env;
 use std::fmt;
+use std::fs;
+use std::path;
 
 use anyhow::{anyhow, Result};
 use iref::uri::{Authority, Path, SchemeBuf};
@@ -35,7 +37,14 @@ impl URI {
     }
 
     pub fn from_string(uri: &str) -> Result<URI> {
-        let parsed = Uri::new(uri).map_err(|err| {
+        let uri = if !uri.contains("://") {
+            let p = path::Path::new(&URI::cwd()).join(uri);
+            "file://".to_string() + &p.to_string_lossy()
+        } else {
+            uri.to_string()
+        };
+
+        let parsed = Uri::new(&uri).map_err(|err| {
             let context = format!("{:?}", err);
             anyhow!("Error parsing URI").context(context)
         })?;
@@ -63,8 +72,6 @@ impl URI {
         })
     }
 
-    pub fn to_string(&self) -> String {}
-
     pub fn scheme(&self) -> String {
         self.scheme.clone()
     }
@@ -89,21 +96,21 @@ impl URI {
             _ => URIType::Unknown,
         }
     }
+
+    fn cwd() -> String {
+        match env::current_dir() {
+            Ok(path_buf) => path_buf.as_path().to_string_lossy().to_string(),
+            Err(_) => "/".to_string(),
+        }
+    }
 }
 
 impl Default for URI {
     fn default() -> URI {
-        match env::current_dir() {
-            Ok(path_buf) => URI {
-                scheme: "file".to_string(),
-                authority: "".to_string(),
-                path: path_buf.as_path().to_string_lossy().to_string(),
-            },
-            Err(_) => URI {
-                scheme: "file".to_string(),
-                authority: "".to_string(),
-                path: "/".to_string(),
-            },
+        URI {
+            scheme: "file".to_string(),
+            authority: "".to_string(),
+            path: Self::cwd(),
         }
     }
 }
@@ -112,7 +119,7 @@ impl fmt::Display for URI {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let scheme = SchemeBuf::new(self.scheme.as_bytes().to_vec());
         if scheme.is_err() {
-            write!(f, "<INVALID_URI_SCHEME:{}>", self.scheme);
+            write!(f, "<INVALID_URI_SCHEME:{}>", self.scheme)?;
             return Ok(());
         }
         let scheme = scheme.unwrap();
@@ -122,8 +129,8 @@ impl fmt::Display for URI {
         } else {
             match Authority::new(&self.authority) {
                 Ok(auth) => Some(auth),
-                Err(err) => {
-                    write!(f, "<INVALID_URI_AUTHORITY:{}>", self.authority);
+                Err(_) => {
+                    write!(f, "<INVALID_URI_AUTHORITY:{}>", self.authority)?;
                     return Ok(());
                 }
             }
@@ -131,7 +138,7 @@ impl fmt::Display for URI {
 
         let path = Path::new(&self.path);
         if path.is_err() {
-            write!(f, "<INVALID_URI_PATH:{}>", self.path);
+            write!(f, "<INVALID_URI_PATH:{}>", self.path)?;
             return Ok(());
         }
         let path = path.unwrap();
