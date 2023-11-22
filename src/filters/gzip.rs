@@ -7,7 +7,7 @@ use std::default::Default;
 use anyhow::{anyhow, Result};
 use binrw::io::Cursor;
 use binrw::BinRead;
-use miniz_oxide::deflate::compress_to_vec_zlib;
+use miniz_oxide::deflate;
 use miniz_oxide::inflate;
 
 use crate::filters::Filter;
@@ -25,9 +25,9 @@ impl GZipFilter {
     pub fn from_config(config: &storage::FilterConfig) -> Self {
         match config {
             storage::FilterConfig::Compression {
-                compressor_type,
+                compressor_type: _,
                 compression_level,
-                reinterpret_type,
+                reinterpret_type: _,
             } => {
                 if compression_level >= &0 {
                     GZipFilter::new(*cmp::min(compression_level, &10) as u8)
@@ -39,25 +39,17 @@ impl GZipFilter {
         }
     }
 
-    pub fn compress(
-        &self,
-        input: &mut Vec<u8>,
-        output: &mut Vec<u8>,
-    ) -> Result<()> {
-        let compressed = compress_to_vec_zlib(input, self.level);
+    pub fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let compressed = deflate::compress_to_vec_zlib(input, self.level);
         output.resize(compressed.len(), 0);
         output.copy_from_slice(&compressed);
         Ok(())
     }
 
-    pub fn decompress<'inp, 'out>(
-        &self,
-        input: &'inp [u8],
-        output: &'out mut [u8],
-    ) -> Result<()> {
+    pub fn decompress(&self, input: &[u8], output: &mut [u8]) -> Result<()> {
         inflate::decompress_slice_iter_to_slice(
             output,
-            vec![input].iter().map(|i| *i),
+            [input].iter().copied(),
             true,
             false,
         )

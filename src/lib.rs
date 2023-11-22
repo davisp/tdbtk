@@ -4,4 +4,5 @@
 pub mod array;
 pub mod datatype;
 pub mod filters;
+pub mod io;
 pub mod storage;

@@ -198,13 +198,15 @@ pub struct GenericTileHeader {
 mod tests {
     use super::*;
     use crate::filters::FilterChain;
+    use crate::io::PosixVFSService;
     use binrw::io::Cursor;
     use binrw::BinRead;
     use util::read_test_file_at;
 
     #[test]
     fn basic_read() {
-        let header_data = read_test_file_at(
+        let io = PosixVFSService::new();
+        let header_data = io.read_file(
             "resources/schema/schema_1".to_string(),
             GENERIC_TILE_HEADER_SIZE,
             0,
