@@ -251,13 +251,6 @@ mod tests {
 
         println!("Schema! {:?}", s);
 
-        // let mut unfiltered = Vec::new();
-        // chain
-        //     .unfilter(&mut tile_data, &mut unfiltered)
-        //     .unwrap_or_else(|err| {
-        //         panic!("Failed to unfilter tile data: {:?}", err);
-        //     });
-
         Ok(())
     }
 }
