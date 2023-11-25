@@ -289,3 +289,43 @@ impl VFSService for PosixVFSService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::io::service::VFSService;
+    use crate::io::uri;
+    use anyhow::Result;
+    use std::path;
+
+    #[test]
+    fn walk_files_test() -> Result<()> {
+        let mut path = path::PathBuf::new();
+        path.push(env!("CARGO_MANIFEST_DIR"));
+        path.push("src");
+
+        let uri =
+            uri::URI::from_string(path.as_path().to_string_lossy().as_ref())?;
+
+        let vfs = PosixVFSService::default();
+
+        let mut file_count = 0;
+        let mut total_size = 0;
+        vfs.walk_files(&uri, &mut |entry| {
+            assert!(!entry.uri().to_string().is_empty());
+            assert!(matches!(entry.entry_type(), FSEntryType::File));
+            assert!(entry.size() > 0);
+            file_count += 1;
+            total_size += entry.size();
+            Ok(true)
+        })?;
+
+        assert!(file_count > 0);
+        assert!(total_size > 0);
+
+        let dir_size = vfs.dir_size(&uri)?;
+        assert_eq!(dir_size, total_size);
+
+        Ok(())
+    }
+}
