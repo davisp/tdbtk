@@ -109,7 +109,7 @@ impl VFSService for PosixVFSService {
     fn file_size(&self, uri: &uri::URI) -> Result<u64> {
         let md = fs::metadata(uri.path())?;
         if !md.is_file() {
-            let ctx = format!("URI: {}", uri.to_string());
+            let ctx = format!("URI: {}", uri);
             return Err(anyhow!("URI is not a file.").context(ctx));
         }
 
@@ -129,7 +129,7 @@ impl VFSService for PosixVFSService {
         buffer: &mut [u8],
     ) -> Result<()> {
         if buffer.len() < nbytes as usize {
-            let context = format!("While reading from {}", uri.to_string());
+            let context = format!("While reading from {}", uri);
             return Err(anyhow!(
                 "Unable to read {} bytes into buffer with length {}",
                 nbytes,
@@ -172,10 +172,12 @@ impl VFSService for PosixVFSService {
             .map_err(|err| {
                 let context = format!("{:?}", err);
                 anyhow!("Error opening file for writing: {}", uri.to_string())
+                    .context(context)
             })?;
         file.write_all_at(offset, buffer).map_err(|err| {
             let context = format!("{:?}", err);
             anyhow!("Error writing data to {}", uri.to_string())
+                .context(context)
         })?;
         Ok(())
     }
@@ -213,7 +215,8 @@ impl VFSService for PosixVFSService {
                 return Err(anyhow!(
                     "Error reading directory {}",
                     uri.to_string()
-                ));
+                )
+                .context(context));
             }
             let entry = entry.unwrap();
 
