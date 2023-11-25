@@ -154,7 +154,7 @@ mod tests {
         let mut filtered = Vec::new();
 
         filter
-            .compress(&mut unfiltered, &mut filtered)
+            .compress(&unfiltered, &mut filtered)
             .unwrap_or_else(|err| {
                 panic!("Failed to gzip compress buffer: {:?}", err);
             });
@@ -187,7 +187,7 @@ mod tests {
         let mut filtered = Vec::new();
 
         filter
-            .compress(&mut unfiltered, &mut filtered)
+            .compress(&unfiltered, &mut filtered)
             .unwrap_or_else(|err| {
                 panic!("Failed to gzip compress buffer: {:?}", err);
             });
