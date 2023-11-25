@@ -83,6 +83,14 @@ impl URI {
         self.path.clone()
     }
 
+    pub fn join(&self, path: &str) -> URI {
+        URI {
+            scheme: self.scheme.clone(),
+            authority: self.authority.clone(),
+            path: self.path.clone() + "/" + path,
+        }
+    }
+
     pub fn uri_type(&self) -> URIType {
         match self.scheme.as_str() {
             "azure" => URIType::Azure,

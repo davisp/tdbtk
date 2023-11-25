@@ -66,7 +66,7 @@ impl VFSService for PosixVFSService {
 
     fn dir_size(&self, uri: &uri::URI) -> Result<u64> {
         let mut size = 0;
-        self.walk_files(uri, |entry: &FSEntry| {
+        self.walk_files(uri, &mut |entry: &FSEntry| {
             size += entry.size();
             Ok(true)
         })?;
@@ -251,10 +251,41 @@ impl VFSService for PosixVFSService {
         Ok(ret)
     }
 
-    fn walk_files<F>(&self, _uri: &uri::URI, _f: F) -> Result<()>
+    fn walk_files<F>(&self, uri: &uri::URI, callback: &mut F) -> Result<()>
     where
         F: FnMut(&FSEntry) -> Result<bool>,
     {
-        unimplemented!("Not implemented.")
+        let mut to_visit = vec![uri.clone()];
+
+        while let Some(next_uri) = to_visit.pop() {
+            let Ok(reader) = fs::read_dir(next_uri.path()) else {
+                continue;
+            };
+
+            for entry in reader {
+                let Ok(entry) = entry else {
+                    continue;
+                };
+
+                let os_path = entry.file_name().to_string_lossy().to_string();
+                let entry_uri = next_uri.join(&os_path);
+
+                let Ok(md) = entry.metadata() else {
+                    continue;
+                };
+
+                if md.is_dir() {
+                    to_visit.push(entry_uri);
+                } else if md.is_file() {
+                    let fsentry =
+                        FSEntry::new(entry_uri, FSEntryType::File, md.len());
+                    if !callback(&fsentry)? {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }

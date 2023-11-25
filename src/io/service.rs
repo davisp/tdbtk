@@ -52,7 +52,7 @@ pub trait VFSService {
     fn file_remove(&self, uri: &uri::URI) -> Result<()>;
 
     fn ls(&self, uri: &uri::URI) -> Result<Vec<FSEntry>>;
-    fn walk_files<F>(&self, uri: &uri::URI, f: F) -> Result<()>
+    fn walk_files<F>(&self, uri: &uri::URI, f: &mut F) -> Result<()>
     where
         F: FnMut(&FSEntry) -> Result<bool>;
 }
