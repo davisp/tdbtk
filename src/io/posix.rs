@@ -6,6 +6,7 @@ use std::io;
 
 use anyhow::{anyhow, Result};
 use positioned_io::{ReadAt, WriteAt};
+use walkdir as wd;
 
 use crate::io::service::VFSService;
 use crate::io::uri;
@@ -20,6 +21,34 @@ impl PosixVFSService {
             let context = format!("{:?}", err);
             anyhow!("Error opening {}", uri.to_string()).context(context)
         })
+    }
+
+    fn entry_to_fsentry(entry: &wd::DirEntry) -> Result<FSEntry> {
+        let os_name = entry.file_name().to_string_lossy().to_string();
+        let entry_uri = uri::URI::from_string(&os_name).map_err(|err| {
+            let context = format!("{:?}", err);
+            anyhow!(
+                "Error converting file name to URI: {:?}",
+                entry.file_name()
+            )
+            .context(context)
+        })?;
+
+        let md = entry.metadata().map_err(|err| {
+            let context = format!("{:?}", err);
+            anyhow!("Error reading file metadata for: {:?}", entry.path())
+                .context(context)
+        })?;
+
+        let entry_type = if md.is_dir() {
+            FSEntryType::Dir
+        } else if md.is_file() {
+            FSEntryType::File
+        } else {
+            FSEntryType::Unknown
+        };
+
+        Ok(FSEntry::new(entry_uri, entry_type, md.len()))
     }
 }
 
@@ -204,48 +233,12 @@ impl VFSService for PosixVFSService {
 
     fn ls(&self, uri: &uri::URI) -> Result<Vec<FSEntry>> {
         let mut ret = Vec::new();
-        let reader = fs::read_dir(uri.path()).map_err(|err| {
-            let context = format!("{:}?", err);
-            anyhow!("Error reading directory: {}", uri.to_string())
-                .context(context)
-        })?;
-        for entry in reader {
-            if entry.is_err() {
-                let context = format!("{:?}", entry);
-                return Err(anyhow!(
-                    "Error reading directory {}",
-                    uri.to_string()
-                )
-                .context(context));
-            }
-            let entry = entry.unwrap();
+        let wd = wd::WalkDir::new(uri.path())
+            .max_depth(1)
+            .sort_by_key(|a| a.file_name().to_owned());
 
-            let os_path = entry.file_name().to_string_lossy().to_string();
-            let uri = uri::URI::from_string(&os_path).map_err(|err| {
-                let context = format!("{:?}", err);
-                anyhow!(
-                    "Error converting file name to URI: {:?}",
-                    entry.file_name()
-                )
-                .context(context)
-            })?;
-
-            let md = entry.metadata().map_err(|err| {
-                let context = format!("{:?}", err);
-                anyhow!("Error reading directory {}", uri.to_string())
-                    .context(context)
-            })?;
-
-            let entry_type = if md.is_dir() {
-                FSEntryType::Dir
-            } else if md.is_file() {
-                FSEntryType::File
-            } else {
-                FSEntryType::Unknown
-            };
-
-            let fsentry = FSEntry::new(uri, entry_type, md.len());
-            ret.push(fsentry);
+        for entry in wd.into_iter().filter_map(|e| e.ok()) {
+            ret.push(PosixVFSService::entry_to_fsentry(&entry)?);
         }
 
         Ok(ret)
@@ -255,34 +248,26 @@ impl VFSService for PosixVFSService {
     where
         F: FnMut(&FSEntry) -> Result<bool>,
     {
-        let mut to_visit = vec![uri.clone()];
+        let wd = wd::WalkDir::new(uri.path())
+            .sort_by_key(|a| a.file_name().to_owned());
 
-        while let Some(next_uri) = to_visit.pop() {
-            let Ok(reader) = fs::read_dir(next_uri.path()) else {
-                continue;
+        let file_filter =
+            |e: wd::Result<wd::DirEntry>| -> Option<wd::DirEntry> {
+                if e.is_err() {
+                    return None;
+                }
+
+                if !e.as_ref().unwrap().file_type().is_file() {
+                    return None;
+                }
+
+                e.ok()
             };
 
-            for entry in reader {
-                let Ok(entry) = entry else {
-                    continue;
-                };
-
-                let os_path = entry.file_name().to_string_lossy().to_string();
-                let entry_uri = next_uri.join(&os_path);
-
-                let Ok(md) = entry.metadata() else {
-                    continue;
-                };
-
-                if md.is_dir() {
-                    to_visit.push(entry_uri);
-                } else if md.is_file() {
-                    let fsentry =
-                        FSEntry::new(entry_uri, FSEntryType::File, md.len());
-                    if !callback(&fsentry)? {
-                        return Ok(());
-                    }
-                }
+        for entry in wd.into_iter().filter_map(file_filter) {
+            let fsentry = PosixVFSService::entry_to_fsentry(&entry)?;
+            if !callback(&fsentry)? {
+                return Ok(());
             }
         }
 
