@@ -3,7 +3,9 @@ name = "tdbtk"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[test]]
+name = "integration"
+path = "tests/tests.rs"
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -25,6 +27,3 @@ version = "1.0.50"
 
 [dependencies.walkdir]
 version = "2.4.0"
-
-[dev-dependencies.util]
-path = "util"
