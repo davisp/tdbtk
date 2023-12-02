@@ -163,6 +163,7 @@ pub struct DimensionLabel {
 #[binrw]
 #[brw(little)]
 pub struct ArraySchema {
+    #[br(dbg)]
     #[br(assert(version <= storage::CURRENT_FORMAT_VERSION,
         "Invalid version {} is newer than library version {}",
             version, storage::CURRENT_FORMAT_VERSION))]
@@ -186,6 +187,7 @@ pub struct ArraySchema {
     #[brw(assert(!matches!(cell_order, Layout::Invalid)))]
     cell_order: Layout,
 
+    #[br(dbg)]
     capacity: u64,
 
     #[br(args(version))]
@@ -292,32 +294,14 @@ fn enumeration_name_map_writer(map: &HashMap<String, String>) -> BinResult<()> {
 
 pub fn read(uri: &uri::URI) -> Result<ArraySchema> {
     let vfs = PosixVFSService::default();
-    let mut header_data = vec![0; storage::GENERIC_TILE_HEADER_SIZE as usize];
-    vfs.file_read(uri, storage::GENERIC_TILE_HEADER_SIZE, 0, &mut header_data)?;
-    let mut reader = Cursor::new(header_data);
+
+    let schema_data = vfs.file_read_vec(uri, u64::MAX, 0)?;
+    let mut reader = Cursor::new(schema_data);
+
     let header = storage::GenericTileHeader::read(&mut reader)?;
-
-    let mut pipeline_data = vec![0; header.filter_pipeline_size as usize];
-    vfs.file_read(
-        uri,
-        header.filter_pipeline_size as u64,
-        storage::GENERIC_TILE_HEADER_SIZE,
-        &mut pipeline_data,
-    )?;
-    let mut reader = Cursor::new(pipeline_data);
-
     let pipeline =
         storage::FilterList::read_args(&mut reader, (header.version,))?;
-
     let chain = filters::FilterChain::from_list(&pipeline);
-
-    let disk_data = vfs.file_read_vec(
-        uri,
-        header.persisted_size,
-        storage::GENERIC_TILE_HEADER_SIZE + header.filter_pipeline_size as u64,
-    )?;
-
-    let mut reader = Cursor::new(disk_data);
     let mut chunks = storage::ChunkedData::read(&mut reader)?;
 
     let data = chain.unfilter_chunks(&mut chunks).map_err(|err| {
@@ -348,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_read() -> Result<()> {
-        let uri = uri::URI::from_string("/Users/davisp/github/tiledb/unit-test-arrays/v2_17_3/DENSE_v2_17_3_DATETIME_AS/__schema/__1700148483665_1700148483665_cb6b456f51154aa0b2cae4e9bedf09a0")?;
+        let uri = uri::URI::from_string("/Users/davisp/github/tiledb/unit-test-arrays/v2_9_1/SPARSE_v2_9_1_UINT16_DATETIME_US/__schema/__1653499966512_1653499966512_8135e35bf7c9483892957c6e0bcbd86a")?;
         let _ = read(&uri)?;
 
         Ok(())
