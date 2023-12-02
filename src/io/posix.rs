@@ -24,8 +24,8 @@ impl PosixVFSService {
     }
 
     fn entry_to_fsentry(entry: &wd::DirEntry) -> Result<FSEntry> {
-        let os_name = entry.file_name().to_string_lossy().to_string();
-        let entry_uri = uri::URI::from_string(&os_name).map_err(|err| {
+        let os_path = entry.path().to_string_lossy().to_string();
+        let entry_uri = uri::URI::from_string(&os_path).map_err(|err| {
             let context = format!("{:?}", err);
             anyhow!(
                 "Error converting file name to URI: {:?}",
@@ -238,7 +238,8 @@ impl VFSService for PosixVFSService {
             .sort_by_key(|a| a.file_name().to_owned());
 
         for entry in wd.into_iter().filter_map(|e| e.ok()) {
-            ret.push(PosixVFSService::entry_to_fsentry(&entry)?);
+            let fsentry = PosixVFSService::entry_to_fsentry(&entry)?;
+            ret.push(fsentry);
         }
 
         Ok(ret)

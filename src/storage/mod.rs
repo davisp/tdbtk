@@ -5,7 +5,7 @@ use binrw::binrw;
 
 use crate::filters::FilterType;
 
-mod schema;
+pub mod schema;
 
 pub const CURRENT_FORMAT_VERSION: u32 = 21;
 pub const GENERIC_TILE_HEADER_SIZE: u64 = 34;
@@ -15,6 +15,7 @@ fn is_compression_filter(ftype: FilterType) -> bool {
         ftype as FilterType,
         FilterType::GZip
             | FilterType::Zstd
+            | FilterType::LZ4
             | FilterType::Rle
             | FilterType::BZip2
             | FilterType::Delta
@@ -47,19 +48,32 @@ fn is_no_config_filter(ftype: FilterType) -> bool {
         || is_webp_filter(ftype))
 }
 
+fn has_reinterpret_type(version: u32, filter_type: FilterType) -> bool {
+    if version >= 19 && matches!(filter_type, FilterType::Delta) {
+        return true;
+    }
+
+    if version >= 20 && matches!(filter_type, FilterType::DoubleDelta) {
+        return true;
+    }
+
+    false
+}
+
 #[derive(Clone, Debug, Default)]
 #[binrw]
 #[brw(little)]
-#[br(import { filter_type: FilterType })]
+#[br(import { version: u32, filter_type: FilterType })]
 pub enum FilterConfig {
     #[br(pre_assert(is_compression_filter(filter_type)))]
     Compression {
         #[br(map = |ftype: u8| ftype.into())]
         #[bw(map = |ftype: &FilterType| *ftype as u8)]
         compressor_type: FilterType,
+
         compression_level: i32,
-        #[br(if(matches!(compressor_type,
-            FilterType::Delta | FilterType::DoubleDelta)))]
+
+        #[br(if(has_reinterpret_type(version, filter_type)))]
         reinterpret_type: u8,
     },
     #[br(pre_assert(is_bit_width_reduction_filter(filter_type)))]
@@ -88,14 +102,16 @@ pub enum FilterConfig {
 #[derive(Clone, Debug, Default)]
 #[binrw]
 #[brw(little)]
+#[br(import ( version: u32 ))]
 pub struct Filter {
     #[br(map = |ftype: u8| ftype.into())]
     #[bw(map = |ftype: &FilterType| *ftype as u8)]
     #[brw(assert(!matches!(filter_type, FilterType::Invalid)))]
     filter_type: FilterType,
+
     metadata_len: u32,
 
-    #[br(args { filter_type })]
+    #[br(args { version, filter_type })]
     config: FilterConfig,
 }
 
@@ -109,14 +125,17 @@ impl Filter {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[binrw]
 #[brw(little)]
+#[br(import ( version: u32 ))]
 pub struct FilterList {
     max_chunk_size: u32,
+
     num_filters: u32,
 
     #[br(count(num_filters))]
+    #[br(args {inner: (version,)})]
     filters: Vec<Filter>,
 }
 
@@ -192,65 +211,4 @@ pub struct GenericTileHeader {
     cell_size: u64,
     encryption_type: u8,
     filter_pipeline_size: u32,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::filters::FilterChain;
-    use crate::io::service::VFSService;
-    use crate::io::{uri, PosixVFSService};
-    use anyhow::Result;
-    use binrw::io::Cursor;
-    use binrw::BinRead;
-
-    #[test]
-    fn basic_read() -> Result<()> {
-        let vfs = PosixVFSService::default();
-        let mut header_data = vec![0; GENERIC_TILE_HEADER_SIZE as usize];
-        vfs.file_read(
-            &uri::URI::from_string("resources/schema/schema_1")?,
-            GENERIC_TILE_HEADER_SIZE,
-            0,
-            &mut header_data,
-        )?;
-        let mut reader = Cursor::new(header_data);
-        let header = GenericTileHeader::read(&mut reader).unwrap();
-        println!("{:?}", header);
-
-        let mut pipeline_data = vec![0; header.filter_pipeline_size as usize];
-        vfs.file_read(
-            &uri::URI::from_string("resources/schema/schema_1")?,
-            header.filter_pipeline_size as u64,
-            GENERIC_TILE_HEADER_SIZE,
-            &mut pipeline_data,
-        )?;
-        let mut reader = Cursor::new(pipeline_data);
-        let pipeline = FilterList::read(&mut reader).unwrap();
-        println!("{:?}", pipeline);
-
-        let chain = FilterChain::from_list(&pipeline);
-
-        let disk_data = vfs.file_read_vec(
-            &uri::URI::from_string("resources/schema/schema_1")?,
-            header.persisted_size,
-            GENERIC_TILE_HEADER_SIZE + header.filter_pipeline_size as u64,
-        )?;
-
-        let mut reader = Cursor::new(disk_data);
-        let mut chunks = ChunkedData::read(&mut reader).unwrap();
-
-        let data = chain.unfilter_chunks(&mut chunks).unwrap_or_else(|err| {
-            panic!("Failed to unfilter tile data: {:?}", err);
-        });
-
-        let mut reader = Cursor::new(data);
-        let s = schema::ArraySchema::read(&mut reader).unwrap_or_else(|err| {
-            panic!("Failed to read schema: {:?}", err);
-        });
-
-        println!("Schema! {:?}", s);
-
-        Ok(())
-    }
 }
