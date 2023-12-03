@@ -2,6 +2,7 @@
 // Copyright (c) 2023 TileDB, Inc.
 
 pub mod filter;
+pub mod fragment;
 pub mod schema;
 pub mod tile;
 

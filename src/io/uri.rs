@@ -31,7 +31,7 @@ impl URI {
         URI {
             scheme: "file".to_string(),
             authority: "".to_string(),
-            path: "/foo/bar/baz".to_string(),
+            path: "/".to_string(),
         }
     }
 
@@ -83,11 +83,44 @@ impl URI {
         self.path.clone()
     }
 
-    pub fn join(&self, path: &str) -> URI {
+    pub fn last_path_part(&self) -> String {
+        if let Some(last_slash) = self.path.rfind('/') {
+            self.path[last_slash + 1..].to_string()
+        } else {
+            self.path.clone()
+        }
+    }
+
+    pub fn remove_trailing_slash(&self) -> URI {
+        let mut new_path = self.path.clone();
+
+        // PJD: I bet this is super bad creating and destroying strings
+        // repeatedly. Plus CPU slow because UTF-8. I bet something like
+        // create an iterator, reverse, it drop slashes, reverse again
+        // and join would likely be better. Eventually I'm guessing that'll
+        // be a lot easier so whatevs for now.
+        while new_path.ends_with('/') {
+            new_path = new_path[..new_path.len() - 1].to_string();
+        }
+
         URI {
             scheme: self.scheme.clone(),
             authority: self.authority.clone(),
-            path: self.path.clone() + "/" + path,
+            path: new_path,
+        }
+    }
+
+    pub fn join(&self, path: &str) -> URI {
+        let new_path = if self.path.ends_with('/') {
+            self.path.clone() + path
+        } else {
+            self.path.clone() + "/" + path
+        };
+
+        URI {
+            scheme: self.scheme.clone(),
+            authority: self.authority.clone(),
+            path: new_path,
         }
     }
 
