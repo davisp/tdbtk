@@ -9,10 +9,7 @@ use binrw::{binrw, BinRead, BinResult, BinWrite, Error, VecArgs};
 
 use crate::array::{ArrayType, DataOrder, Layout};
 use crate::datatype::DataType;
-use crate::filters;
-use crate::io::service::VFSService;
 use crate::io::uri;
-use crate::io::PosixVFSService;
 use crate::storage;
 use crate::Result;
 
@@ -292,24 +289,8 @@ fn enumeration_name_map_writer(map: &HashMap<String, String>) -> BinResult<()> {
     Ok(())
 }
 
-pub fn read(uri: &uri::URI) -> Result<ArraySchema> {
-    let vfs = PosixVFSService::default();
-
-    let schema_data = vfs.file_read_vec(uri, u64::MAX, 0)?;
-    let mut reader = Cursor::new(schema_data);
-
-    let header = storage::GenericTileHeader::read(&mut reader)?;
-    let pipeline =
-        storage::FilterList::read_args(&mut reader, (header.version,))?;
-    let chain = filters::FilterChain::from_list(&pipeline);
-    let mut chunks = storage::ChunkedData::read(&mut reader)?;
-
-    let data = chain.unfilter_chunks(&mut chunks).map_err(|err| {
-        let context = format!("{:?}", err);
-        anyhow!("Error unfiltering schema data from {}", uri.to_string())
-            .context(context)
-    })?;
-
+pub fn read_schema(uri: &uri::URI) -> Result<ArraySchema> {
+    let data = storage::read_generic_tile(uri, 0)?;
     let mut reader = Cursor::new(data);
     let s = ArraySchema::read(&mut reader).map_err(|err| {
         let context = format!("{:?}", err);
@@ -326,14 +307,15 @@ mod tests {
 
     #[test]
     fn basic_read() -> Result<()> {
-        let _ = read(&uri::URI::from_string("resources/schema/schema_1")?)?;
+        let _ =
+            read_schema(&uri::URI::from_string("resources/schema/schema_1")?)?;
         Ok(())
     }
 
     #[test]
     fn test_read() -> Result<()> {
         let uri = uri::URI::from_string("/Users/davisp/github/tiledb/unit-test-arrays/v2_9_1/SPARSE_v2_9_1_UINT16_DATETIME_US/__schema/__1653499966512_1653499966512_8135e35bf7c9483892957c6e0bcbd86a")?;
-        let _ = read(&uri)?;
+        let _ = read_schema(&uri)?;
 
         Ok(())
     }

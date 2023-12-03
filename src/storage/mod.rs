@@ -8,5 +8,6 @@ pub mod tile;
 pub const CURRENT_FORMAT_VERSION: u32 = 21;
 
 pub use crate::storage::filter::*;
+pub use crate::storage::fragment::*;
 pub use crate::storage::schema::*;
 pub use crate::storage::tile::*;

@@ -1,7 +1,16 @@
 // This file is part of tdbtk released under the MIT license.
 // Copyright (c) 2023 TileDB, Inc.
 
-use binrw::binrw;
+use anyhow::anyhow;
+use binrw::io::Cursor;
+use binrw::{binrw, BinRead};
+
+use crate::filters;
+use crate::io::service::VFSService;
+use crate::io::uri;
+use crate::io::PosixVFSService;
+use crate::storage;
+use crate::Result;
 
 pub const GENERIC_TILE_HEADER_SIZE: u64 = 34;
 
@@ -71,4 +80,36 @@ pub struct GenericTileHeader {
     pub cell_size: u64,
     pub encryption_type: u8,
     pub filter_pipeline_size: u32,
+}
+
+pub fn read_generic_tile(uri: &uri::URI, offset: u64) -> Result<Vec<u8>> {
+    let vfs = PosixVFSService::default();
+
+    let size = GENERIC_TILE_HEADER_SIZE;
+    let data = vfs.file_read_vec(uri, size, offset)?;
+    let mut reader = Cursor::new(data);
+    let header = GenericTileHeader::read(&mut reader)?;
+
+    let size = header.filter_pipeline_size as u64;
+    let pipeline_offset = offset + GENERIC_TILE_HEADER_SIZE;
+    let data = vfs.file_read_vec(uri, size, pipeline_offset)?;
+    let mut reader = Cursor::new(data);
+    let pipeline =
+        storage::FilterList::read_args(&mut reader, (header.version,))?;
+    let chain = filters::FilterChain::from_list(&pipeline);
+
+    let size = header.persisted_size;
+    let data_offset =
+        offset + GENERIC_TILE_HEADER_SIZE + header.filter_pipeline_size as u64;
+    let data = vfs.file_read_vec(uri, size, data_offset)?;
+    let mut reader = Cursor::new(data);
+    let mut chunks = storage::ChunkedData::read(&mut reader)?;
+
+    let data = chain.unfilter_chunks(&mut chunks).map_err(|err| {
+        let context = format!("{:?}", err);
+        anyhow!("Error unfiltering schema data from {}", uri.to_string())
+            .context(context)
+    })?;
+
+    Ok(data)
 }
