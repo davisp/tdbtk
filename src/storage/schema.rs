@@ -160,62 +160,60 @@ pub struct DimensionLabel {
 #[binrw]
 #[brw(little)]
 pub struct ArraySchema {
-    #[br(dbg)]
     #[br(assert(version <= storage::CURRENT_FORMAT_VERSION,
         "Invalid version {} is newer than library version {}",
             version, storage::CURRENT_FORMAT_VERSION))]
-    version: u32,
+    pub(crate) version: u32,
 
     #[br(if(version >= 5, 0))]
-    allows_dups: u8,
+    pub(crate) allows_dups: u8,
 
     #[br(map = |atype: u8| atype.into())]
     #[bw(map = |atype: &ArrayType| *atype as u8)]
     #[brw(assert(!matches!(array_type, ArrayType::Invalid)))]
-    array_type: ArrayType,
+    pub(crate) array_type: ArrayType,
 
     #[br(map = |layout: u8| layout.into())]
     #[bw(map = |layout: &Layout| *layout as u8)]
     #[brw(assert(!matches!(tile_order, Layout::Invalid)))]
-    tile_order: Layout,
+    pub(crate) tile_order: Layout,
 
     #[br(map = |layout: u8| layout.into())]
     #[bw(map = |layout: &Layout| *layout as u8)]
     #[brw(assert(!matches!(cell_order, Layout::Invalid)))]
-    cell_order: Layout,
+    pub(crate) cell_order: Layout,
 
-    #[br(dbg)]
-    capacity: u64,
-
-    #[br(args(version))]
-    coords_filters: storage::FilterList,
+    pub(crate) capacity: u64,
 
     #[br(args(version))]
-    cell_var_filters: storage::FilterList,
+    pub(crate) coords_filters: storage::FilterList,
+
+    #[br(args(version))]
+    pub(crate) cell_var_filters: storage::FilterList,
 
     #[br(args(version))]
     #[br(if(version >= 7, storage::FilterList::default()))]
-    cell_validity_filters: storage::FilterList,
+    pub(crate) cell_validity_filters: storage::FilterList,
 
     #[br(args { version, coords_filters: coords_filters.clone() })]
-    domain: Domain,
+    pub(crate) domain: Domain,
 
-    num_attributes: u32,
+    pub(crate) num_attributes: u32,
 
     #[br(count = num_attributes, args {inner: (
         version,
     )})]
-    attributes: Vec<Attribute>,
+    pub(crate) attributes: Vec<Attribute>,
 
     #[br(if(version >= 18, 0))]
-    num_dimension_labels: u32,
+    pub(crate) num_dimension_labels: u32,
 
     #[br(count = num_dimension_labels)]
-    dimension_labels: Vec<DimensionLabel>,
+    pub(crate) dimension_labels: Vec<DimensionLabel>,
 
     #[br(parse_with = enumeration_name_map_parser)]
     #[bw(write_with = enumeration_name_map_writer)]
-    enumeration_map: HashMap<String, String>,
+    pub(crate) enumeration_map: HashMap<String, String>,
 }
 
 fn cell_val_size(dtype: DataType) -> u32 {

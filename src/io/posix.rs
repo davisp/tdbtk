@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use positioned_io::{ReadAt, WriteAt};
 use walkdir as wd;
 
-use crate::io::service::VFSService;
+use crate::io::service::{VFSService, WalkOptions};
 use crate::io::uri;
 use crate::io::{FSEntry, FSEntryType};
 
@@ -95,7 +95,7 @@ impl VFSService for PosixVFSService {
 
     fn dir_size(&self, uri: &uri::URI) -> Result<u64> {
         let mut size = 0;
-        self.walk_files(uri, &mut |entry: &FSEntry| {
+        self.walk(uri, &mut |entry: &FSEntry| {
             size += entry.size();
             Ok(true)
         })?;
@@ -245,12 +245,34 @@ impl VFSService for PosixVFSService {
         Ok(ret)
     }
 
-    fn walk_files<F>(&self, uri: &uri::URI, callback: &mut F) -> Result<()>
+    fn walk<F>(&self, uri: &uri::URI, callback: &mut F) -> Result<()>
+    where
+        F: FnMut(&FSEntry) -> Result<bool>,
+    {
+        let opts = WalkOptions::default();
+        self.walk_with_options(uri, &opts, callback)
+    }
+
+    fn walk_with_options<F>(
+        &self,
+        uri: &uri::URI,
+        options: &WalkOptions,
+        callback: &mut F,
+    ) -> Result<()>
     where
         F: FnMut(&FSEntry) -> Result<bool>,
     {
         let wd = wd::WalkDir::new(uri.path())
-            .sort_by_key(|a| a.file_name().to_owned());
+            .min_depth(options.min_depth())
+            .max_depth(options.max_depth())
+            .follow_links(options.follow_links())
+            .follow_root_links(options.follow_root_links());
+
+        let wd = if options.sort_filenames() {
+            wd.sort_by_file_name()
+        } else {
+            wd
+        };
 
         let file_filter =
             |e: wd::Result<wd::DirEntry>| -> Option<wd::DirEntry> {
@@ -265,7 +287,7 @@ impl VFSService for PosixVFSService {
                 e.ok()
             };
 
-        for entry in wd.into_iter().filter_map(file_filter) {
+        for entry in wd.into_iter().filter_map(|e| e.ok()) {
             let fsentry = PosixVFSService::entry_to_fsentry(&entry)?;
             if !callback(&fsentry)? {
                 return Ok(());
@@ -285,7 +307,7 @@ mod tests {
     use std::path;
 
     #[test]
-    fn walk_files_test() -> Result<()> {
+    fn walk_test() -> Result<()> {
         let mut path = path::PathBuf::new();
         path.push(env!("CARGO_MANIFEST_DIR"));
         path.push("src");
@@ -297,9 +319,8 @@ mod tests {
 
         let mut file_count = 0;
         let mut total_size = 0;
-        vfs.walk_files(&uri, &mut |entry| {
+        vfs.walk(&uri, &mut |entry| {
             assert!(!entry.uri().to_string().is_empty());
-            assert!(matches!(entry.entry_type(), FSEntryType::File));
             assert!(entry.size() > 0);
             file_count += 1;
             total_size += entry.size();

@@ -6,6 +6,74 @@ use anyhow::Result;
 use crate::io::uri;
 use crate::io::FSEntry;
 
+pub struct WalkOptions {
+    min_depth: usize,
+    max_depth: usize,
+    follow_links: bool,
+    follow_root_links: bool,
+    sort_filenames: bool,
+}
+
+impl Default for WalkOptions {
+    fn default() -> Self {
+        WalkOptions {
+            min_depth: 0,
+            max_depth: usize::MAX,
+            follow_links: false,
+            follow_root_links: true,
+            sort_filenames: false,
+        }
+    }
+}
+
+// PJD: Are public fields more idiomatic that setter/getter functions?
+impl WalkOptions {
+    pub fn min_depth(&self) -> usize {
+        self.min_depth
+    }
+
+    pub fn set_min_depth(mut self, min_depth: usize) -> Self {
+        self.min_depth = min_depth;
+        self
+    }
+
+    pub fn max_depth(&self) -> usize {
+        self.max_depth
+    }
+
+    pub fn set_max_depth(mut self, max_depth: usize) -> Self {
+        self.max_depth = max_depth;
+        self
+    }
+
+    pub fn follow_links(&self) -> bool {
+        self.follow_links
+    }
+
+    pub fn set_follow_links(mut self, follow_links: bool) -> Self {
+        self.follow_links = follow_links;
+        self
+    }
+
+    pub fn follow_root_links(&self) -> bool {
+        self.follow_root_links
+    }
+
+    pub fn set_follow_root_links(mut self, follow_root_links: bool) -> Self {
+        self.follow_root_links = follow_root_links;
+        self
+    }
+
+    pub fn sort_filenames(&self) -> bool {
+        self.sort_filenames
+    }
+
+    pub fn set_sort_filenames(mut self, sort_filenames: bool) -> Self {
+        self.sort_filenames = sort_filenames;
+        self
+    }
+}
+
 pub trait VFSService {
     // Buckets
     fn bucket_supported(&self) -> Result<bool>;
@@ -52,7 +120,16 @@ pub trait VFSService {
     fn file_remove(&self, uri: &uri::URI) -> Result<()>;
 
     fn ls(&self, uri: &uri::URI) -> Result<Vec<FSEntry>>;
-    fn walk_files<F>(&self, uri: &uri::URI, f: &mut F) -> Result<()>
+    fn walk<F>(&self, uri: &uri::URI, callback: &mut F) -> Result<()>
+    where
+        F: FnMut(&FSEntry) -> Result<bool>;
+
+    fn walk_with_options<F>(
+        &self,
+        uri: &uri::URI,
+        options: &WalkOptions,
+        callback: &mut F,
+    ) -> Result<()>
     where
         F: FnMut(&FSEntry) -> Result<bool>;
 }

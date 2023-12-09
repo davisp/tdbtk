@@ -24,7 +24,6 @@ fn get_fragment_name_version(name: &String) -> FragmentNameVersion {
     }
 
     if let Some(last_underscore) = name.rfind('_') {
-        println!("Last underscore: {} Len: {}", last_underscore, name.len());
         if name.len() - last_underscore - 1 == 32 {
             return FragmentNameVersion::Two;
         }
@@ -173,35 +172,43 @@ impl Fragment {
         let name = uri.remove_trailing_slash().last_path_part();
         let vsn = get_fragment_version(&name)?;
 
-        if vsn <= 2 {
-            Fragment::load_v1_v2(uri, vsn, schemas)
-        } else {
-            panic!("Still working on v1/v2 loading");
-            //Fragment::load_v3_or_newer(uri, vsn, schemas)
-        }
+        // if vsn <= 2 {
+        //     Fragment::load_v1_v2(uri, vsn, schemas)
+        // } else {
+        //     panic!("Still working on v1/v2 loading");
+        //     //Fragment::load_v3_or_newer(uri, vsn, schemas)
+        // }
+
+        Ok(Fragment {
+            uri: uri.clone(),
+            format_version: vsn,
+            footer: None,
+        })
     }
 
-    fn load_v1_v2(
-        uri: &uri::URI,
-        vsn: u32,
-        schemas: HashMap<String, storage::ArraySchema>,
-    ) -> Result<Fragment> {
-        // Pre v10 fragments have an __array_schema.tdb as their schema.
-        let schema = schemas.get("__array_schema.tdb");
-        if schema.is_none() {
-            let context =
-                format!("While loading fragment metadata for {}", uri);
-            return Err(anyhow!(
-                "Failed finding array schema '__array_schema.tdb'"
-            )
-            .context(context));
-        }
-
-        let schema = schema.unwrap();
-
-        let fmd_uri = uri.join("__fragment_metadata.tdb");
-        let data = storage::read_generic_tile(&fmd_uri, 0);
-    }
+    //     fn load_v1_v2(
+    //         uri: &uri::URI,
+    //         vsn: u32,
+    //         schemas: HashMap<String, storage::ArraySchema>,
+    //     ) -> Result<Fragment> {
+    //         // Pre v10 fragments have an __array_schema.tdb as their schema.
+    //         let schema = schemas.get("__array_schema.tdb");
+    //         if schema.is_none() {
+    //             let context =
+    //                 format!("While loading fragment metadata for {}", uri);
+    //             return Err(anyhow!(
+    //                 "Failed finding array schema '__array_schema.tdb'"
+    //             )
+    //             .context(context));
+    //         }
+    //
+    //         let schema = schema.unwrap();
+    //
+    //         let fmd_uri = uri.join("__fragment_metadata.tdb");
+    //         let data = storage::read_generic_tile(&fmd_uri, 0);
+    //
+    //         Ok(Fragment {})
+    //     }
 
     //     fn load_v3_or_newer(
     //         uri: &uri::URI,

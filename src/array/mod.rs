@@ -1,6 +1,8 @@
 // This file is part of tdbtk released under the MIT license.
 // Copyright (c) 2023 TileDB, Inc.
 
+pub mod schema;
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ArrayType {

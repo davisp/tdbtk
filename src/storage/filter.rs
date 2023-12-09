@@ -99,7 +99,6 @@ pub enum FilterConfig {
 #[brw(little)]
 #[br(import ( version: u32 ))]
 pub struct Filter {
-    #[br(dbg)]
     #[br(map = |ftype: u8| ftype.into())]
     #[bw(map = |ftype: &FilterType| *ftype as u8)]
     #[brw(assert(!matches!(filter_type, FilterType::Invalid)))]

@@ -1,11 +1,15 @@
 // This file is part of tdbtk released under the MIT license.
 // Copyright (c) 2023 TileDB, Inc.
 
-mod gzip;
+use std::convert::TryFrom;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use itertools::Itertools;
 
 use crate::storage;
+
+mod empty;
+mod gzip;
 
 pub trait Filter {
     // fn filter(
@@ -75,8 +79,23 @@ impl From<u8> for FilterType {
     }
 }
 
+impl TryFrom<&storage::Filter> for Box<dyn Filter> {
+    type Error = anyhow::Error;
+
+    fn try_from(f: &storage::Filter) -> Result<Box<dyn Filter>, Self::Error> {
+        match f.filter_type() {
+            FilterType::None => Ok(Box::from(empty::EmptyFilter::default())),
+            FilterType::GZip => {
+                Ok(Box::from(gzip::GZipFilter::from_config(f.config())))
+            }
+            ftype => Err(anyhow!("Unsupported filter type: {:?}", ftype)),
+        }
+    }
+}
+
 fn create_filter(filter: &storage::Filter) -> Box<dyn Filter> {
     match filter.filter_type() {
+        FilterType::None => Box::from(empty::EmptyFilter::default()),
         FilterType::GZip => {
             Box::from(gzip::GZipFilter::from_config(filter.config()))
         }
@@ -101,9 +120,7 @@ impl FilterChain {
             panic!("Failed to create filter chain.");
         })
     }
-}
 
-impl FilterChain {
     pub fn unfilter(
         &self,
         input: &mut storage::Chunk,
@@ -149,5 +166,26 @@ impl FilterChain {
         }
 
         Ok(output)
+    }
+}
+
+impl TryFrom<&storage::FilterList> for Box<FilterChain> {
+    type Error = anyhow::Error;
+    fn try_from(
+        list: &storage::FilterList,
+    ) -> Result<Box<FilterChain>, Self::Error> {
+        let mut chain: Option<Box<FilterChain>> = None;
+        for filter in list.filters().iter().rev() {
+            let converted: Box<dyn Filter> = <_>::try_from(filter)?;
+            Some(Box::from(FilterChain {
+                filter: converted,
+                next: chain,
+            }));
+        }
+
+        match chain {
+            Some(val) => Ok(val),
+            None => Err(anyhow!("Empty filter list!")),
+        }
     }
 }
