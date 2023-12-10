@@ -4,7 +4,6 @@
 use std::convert::TryFrom;
 
 use anyhow::{anyhow, Result};
-use itertools::Itertools;
 
 use crate::storage;
 
@@ -177,7 +176,7 @@ impl TryFrom<&storage::FilterList> for Box<FilterChain> {
         let mut chain: Option<Box<FilterChain>> = None;
         for filter in list.filters().iter().rev() {
             let converted: Box<dyn Filter> = <_>::try_from(filter)?;
-            Some(Box::from(FilterChain {
+            chain = Some(Box::from(FilterChain {
                 filter: converted,
                 next: chain,
             }));

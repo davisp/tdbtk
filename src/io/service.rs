@@ -120,16 +120,16 @@ pub trait VFSService {
     fn file_remove(&self, uri: &uri::URI) -> Result<()>;
 
     fn ls(&self, uri: &uri::URI) -> Result<Vec<FSEntry>>;
-    fn walk<F>(&self, uri: &uri::URI, callback: &mut F) -> Result<()>
-    where
-        F: FnMut(&FSEntry) -> Result<bool>;
+    fn walk(
+        &self,
+        uri: &uri::URI,
+        callback: &mut dyn FnMut(&FSEntry) -> Result<bool>,
+    ) -> Result<()>;
 
-    fn walk_with_options<F>(
+    fn walk_with_options(
         &self,
         uri: &uri::URI,
         options: &WalkOptions,
-        callback: &mut F,
-    ) -> Result<()>
-    where
-        F: FnMut(&FSEntry) -> Result<bool>;
+        callback: &mut dyn FnMut(&FSEntry) -> Result<bool>,
+    ) -> Result<()>;
 }

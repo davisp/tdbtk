@@ -23,31 +23,31 @@ pub struct Dimension {
     name_size: u32,
 
     #[br(count(name_size))]
-    name: Vec<u8>,
+    pub(crate) name: Vec<u8>,
 
     #[br(if(version >= 5, dtype))]
     #[br(map = |dtype: u8| dtype.into())]
     #[bw(map = |dtype: &DataType| *dtype as u8)]
     #[brw(assert(!matches!(data_type, DataType::Invalid)))]
-    data_type: DataType,
+    pub(crate) data_type: DataType,
 
     #[br(if(version >= 5, cell_val_size(dtype)))]
-    cell_val_num: u32,
+    pub(crate) cell_val_num: u32,
 
     #[br(if(version >= 5, coords_filters))]
-    coords_filters: storage::FilterList,
+    pub(crate) coords_filters: storage::FilterList,
 
     #[br(if(version >= 5, 2 * data_type.size() as u64))]
     domain_size: u64,
 
     #[br(count = domain_size)]
-    range: Vec<u8>,
+    pub(crate) range: Vec<u8>,
 
     null_tile_extent: u8,
 
     #[br(if(null_tile_extent == 0))]
     #[br(count = data_type.size())]
-    tile_extent: Vec<u8>,
+    pub(crate) tile_extent: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -68,7 +68,7 @@ pub struct Domain {
         data_type,
         coords_filters
     )})]
-    dimensions: Vec<Dimension>,
+    pub(crate) dimensions: Vec<Dimension>,
 }
 
 #[derive(Debug)]
@@ -81,79 +81,79 @@ pub struct Attribute {
     #[br(count(name_size))]
     #[br(map = |v: Vec<u8>| String::from_utf8(v).unwrap())]
     #[bw(map = |n: &String| n.as_bytes().to_vec())]
-    name: String,
+    pub(crate) name: String,
 
     #[br(map = |dtype: u8| dtype.into())]
     #[bw(map = |dtype: &DataType| *dtype as u8)]
     #[brw(assert(!matches!(data_type, DataType::Invalid)))]
-    data_type: DataType,
+    pub(crate) data_type: DataType,
 
-    cell_val_num: u32,
+    pub(crate) cell_val_num: u32,
 
     #[br(args(version))]
-    filters: storage::FilterList,
+    pub(crate) filters: storage::FilterList,
 
     #[br(if(version >= 6, 0))]
     fill_value_size: u64,
 
     #[br(count = fill_value_size)]
-    fill_value: Vec<u8>,
+    pub(crate) fill_value: Vec<u8>,
 
     #[br(if(version >= 7, 0))]
-    nullable: u8,
+    pub(crate) nullable: u8,
 
     #[br(if(version >= 7, 0))]
-    fill_value_validity: u8,
+    pub(crate) fill_value_validity: u8,
 
     #[br(if(version >= 17, DataOrder::Unordered))]
     #[br(map = |order: u8| order.into())]
     #[bw(map = |order: &DataOrder| *order as u8)]
     #[brw(assert(!matches!(data_order, DataOrder::Invalid)))]
-    data_order: DataOrder,
+    pub(crate) data_order: DataOrder,
 
     #[br(if(version >= 20, 0))]
     enmr_name_length: u32,
 
     #[br(count = enmr_name_length)]
-    enumeration_name: Vec<u8>,
+    pub(crate) enumeration_name: Vec<u8>,
 }
 
 #[derive(Debug)]
 #[binrw]
 #[brw(little)]
 pub struct DimensionLabel {
-    dimension_id: u32,
+    pub(crate) dimension_id: u32,
 
     name_len: u32,
 
     #[br(count = name_len)]
-    name: Vec<u8>,
+    pub(crate) name: Vec<u8>,
 
-    relative_uri: u8,
+    pub(crate) relative_uri: u8,
 
     uri_size: u64,
 
     #[br(count = uri_size)]
-    uri: Vec<u8>,
+    pub(crate) uri: Vec<u8>,
 
     attribute_name_len: u32,
 
     #[br(count = attribute_name_len)]
-    attribute_name: Vec<u8>,
+    pub(crate) attribute_name: Vec<u8>,
 
     #[br(map = |order: u8| order.into())]
     #[bw(map = |order: &DataOrder| *order as u8)]
     #[brw(assert(!matches!(data_order, DataOrder::Invalid)))]
-    data_order: DataOrder,
+    pub(crate) data_order: DataOrder,
 
     #[br(map = |dtype: u8| dtype.into())]
     #[bw(map = |dtype: &DataType| *dtype as u8)]
     #[brw(assert(!matches!(data_type, DataType::Invalid)))]
-    data_type: DataType,
+    pub(crate) data_type: DataType,
 
-    cell_val_num: u32,
+    pub(crate) cell_val_num: u32,
 
-    is_external: u8,
+    pub(crate) is_external: u8,
 }
 
 #[derive(Debug)]

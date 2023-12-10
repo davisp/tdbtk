@@ -245,23 +245,21 @@ impl VFSService for PosixVFSService {
         Ok(ret)
     }
 
-    fn walk<F>(&self, uri: &uri::URI, callback: &mut F) -> Result<()>
-    where
-        F: FnMut(&FSEntry) -> Result<bool>,
-    {
+    fn walk(
+        &self,
+        uri: &uri::URI,
+        callback: &mut dyn FnMut(&FSEntry) -> Result<bool>,
+    ) -> Result<()> {
         let opts = WalkOptions::default();
         self.walk_with_options(uri, &opts, callback)
     }
 
-    fn walk_with_options<F>(
+    fn walk_with_options(
         &self,
         uri: &uri::URI,
         options: &WalkOptions,
-        callback: &mut F,
-    ) -> Result<()>
-    where
-        F: FnMut(&FSEntry) -> Result<bool>,
-    {
+        callback: &mut dyn FnMut(&FSEntry) -> Result<bool>,
+    ) -> Result<()> {
         let wd = wd::WalkDir::new(uri.path())
             .min_depth(options.min_depth())
             .max_depth(options.max_depth())
@@ -273,19 +271,6 @@ impl VFSService for PosixVFSService {
         } else {
             wd
         };
-
-        let file_filter =
-            |e: wd::Result<wd::DirEntry>| -> Option<wd::DirEntry> {
-                if e.is_err() {
-                    return None;
-                }
-
-                if !e.as_ref().unwrap().file_type().is_file() {
-                    return None;
-                }
-
-                e.ok()
-            };
 
         for entry in wd.into_iter().filter_map(|e| e.ok()) {
             let fsentry = PosixVFSService::entry_to_fsentry(&entry)?;

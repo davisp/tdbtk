@@ -83,6 +83,10 @@ impl URI {
         self.path.clone()
     }
 
+    pub fn path_ref(&self) -> &String {
+        &self.path
+    }
+
     pub fn last_path_part(&self) -> String {
         if let Some(last_slash) = self.path.rfind('/') {
             self.path[last_slash + 1..].to_string()
