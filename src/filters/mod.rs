@@ -7,15 +7,23 @@ use anyhow::{anyhow, Result};
 
 use crate::storage;
 
+mod compression;
 mod empty;
 mod gzip;
+mod lz4;
+mod zstd;
 
 pub trait Filter {
+    // fn from_config(
+    //     config: &storage::FilterConfig,
+    // ) -> Result<Box<dyn Filter>, anyhow::Error>;
+
     // fn filter(
     //     &self,
     //     input: &mut storage::Chunk,
     //     output: &mut storage::Chunk,
     // ) -> Result<()>;
+
     fn unfilter(
         &self,
         input: &mut storage::Chunk,
@@ -83,22 +91,12 @@ impl TryFrom<&storage::Filter> for Box<dyn Filter> {
 
     fn try_from(f: &storage::Filter) -> Result<Box<dyn Filter>, Self::Error> {
         match f.filter_type() {
-            FilterType::None => Ok(Box::from(empty::EmptyFilter::default())),
-            FilterType::GZip => {
-                Ok(Box::from(gzip::GZipFilter::from_config(f.config())))
-            }
+            FilterType::None => empty::EmptyFilter::from_config(f.config()),
+            FilterType::GZip => gzip::GZipFilter::from_config(f.config()),
+            FilterType::LZ4 => lz4::LZ4Filter::from_config(f.config()),
+            FilterType::Zstd => zstd::ZstdFilter::from_config(f.config()),
             ftype => Err(anyhow!("Unsupported filter type: {:?}", ftype)),
         }
-    }
-}
-
-fn create_filter(filter: &storage::Filter) -> Box<dyn Filter> {
-    match filter.filter_type() {
-        FilterType::None => Box::from(empty::EmptyFilter::default()),
-        FilterType::GZip => {
-            Box::from(gzip::GZipFilter::from_config(filter.config()))
-        }
-        ftype => panic!("Unsupported filter type: {:?}", ftype),
     }
 }
 
@@ -108,18 +106,6 @@ pub struct FilterChain {
 }
 
 impl FilterChain {
-    pub fn from_list(list: &storage::FilterList) -> Box<Self> {
-        let chain = list.filters().iter().rev().fold(None, |acc, filter| {
-            Some(Box::from(FilterChain {
-                filter: create_filter(filter),
-                next: acc,
-            }))
-        });
-        chain.unwrap_or_else(|| {
-            panic!("Failed to create filter chain.");
-        })
-    }
-
     pub fn unfilter(
         &self,
         input: &mut storage::Chunk,
@@ -173,18 +159,20 @@ impl TryFrom<&storage::FilterList> for Box<FilterChain> {
     fn try_from(
         list: &storage::FilterList,
     ) -> Result<Box<FilterChain>, Self::Error> {
-        let mut chain: Option<Box<FilterChain>> = None;
+        let mut chain = None;
         for filter in list.filters().iter().rev() {
-            let converted: Box<dyn Filter> = <_>::try_from(filter)?;
+            let next: Box<dyn Filter> = <_>::try_from(filter)?;
             chain = Some(Box::from(FilterChain {
-                filter: converted,
+                filter: next,
                 next: chain,
             }));
         }
 
         match chain {
-            Some(val) => Ok(val),
-            None => Err(anyhow!("Empty filter list!")),
+            Some(filter_chain) => Ok(filter_chain),
+            None => {
+                Err(anyhow!("Error creating filter chain from empty list."))
+            }
         }
     }
 }

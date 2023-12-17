@@ -96,7 +96,7 @@ pub fn read_generic_tile(uri: &uri::URI, offset: u64) -> Result<Vec<u8>> {
     let mut reader = Cursor::new(data);
     let pipeline =
         storage::FilterList::read_args(&mut reader, (header.version,))?;
-    let chain = filters::FilterChain::from_list(&pipeline);
+    let chain: Box<filters::FilterChain> = <_>::try_from(&pipeline)?;
 
     let size = header.persisted_size;
     let data_offset =

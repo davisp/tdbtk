@@ -1,24 +1,30 @@
 // This file is part of tdbtk released under the MIT license.
 // Copyright (c) 2023 TileDB, Inc.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
-use crate::filters::Filter;
+use crate::filters;
 use crate::storage;
 
 #[derive(Default)]
 pub struct EmptyFilter {}
 
 impl EmptyFilter {
-    pub fn from_config(config: &storage::FilterConfig) -> Self {
+    pub fn from_config(
+        config: &storage::FilterConfig,
+    ) -> Result<Box<dyn filters::Filter>> {
         match config {
-            storage::FilterConfig::None => EmptyFilter::default(),
-            _ => panic!("Invalid filter config for empty filter: {:?}", config),
+            storage::FilterConfig::None => {
+                return Ok(Box::from(EmptyFilter {}));
+            }
+            _ => {}
         }
+
+        Err(anyhow!("Invalid config {:?} for EmptyFilter", config))
     }
 }
 
-impl Filter for EmptyFilter {
+impl filters::Filter for EmptyFilter {
     fn unfilter(
         &self,
         input: &mut storage::Chunk,

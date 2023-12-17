@@ -17,6 +17,9 @@ version = "0.13.1"
 [dependencies.iref]
 version = "3.1.3"
 
+[dependencies.lzzzz]
+version = "1.0.4"
+
 [dependencies.miniz_oxide]
 version = "0.7.1"
 
@@ -31,3 +34,6 @@ version = "1.0.50"
 
 [dependencies.walkdir]
 version = "2.4.0"
+
+[dependencies.zstd-safe]
+version = "7.0.0"
