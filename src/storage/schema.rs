@@ -216,6 +216,20 @@ pub struct ArraySchema {
     pub(crate) enumeration_map: HashMap<String, String>,
 }
 
+impl ArraySchema {
+    pub fn load(uri: &uri::URI) -> Result<ArraySchema> {
+        let data = storage::read_generic_tile(uri, 0)?;
+        let mut reader = Cursor::new(data);
+        let s = ArraySchema::read(&mut reader).map_err(|err| {
+            let context = format!("{:?}", err);
+            anyhow!("Error reading schema data from {}", uri.to_string())
+                .context(context)
+        })?;
+
+        Ok(s)
+    }
+}
+
 fn cell_val_size(dtype: DataType) -> u32 {
     if dtype.is_string_type() {
         CELL_VAR_SIZE
@@ -287,33 +301,22 @@ fn enumeration_name_map_writer(map: &HashMap<String, String>) -> BinResult<()> {
     Ok(())
 }
 
-pub fn read_schema(uri: &uri::URI) -> Result<ArraySchema> {
-    let data = storage::read_generic_tile(uri, 0)?;
-    let mut reader = Cursor::new(data);
-    let s = ArraySchema::read(&mut reader).map_err(|err| {
-        let context = format!("{:?}", err);
-        anyhow!("Error reading schema data from {}", uri.to_string())
-            .context(context)
-    })?;
-
-    Ok(s)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn basic_read() -> Result<()> {
-        let _ =
-            read_schema(&uri::URI::from_string("resources/schema/schema_1")?)?;
+        let _ = ArraySchema::load(&uri::URI::from_string(
+            "resources/schema/schema_1",
+        )?)?;
         Ok(())
     }
 
     #[test]
     fn test_read() -> Result<()> {
         let uri = uri::URI::from_string("/Users/davisp/github/tiledb/unit-test-arrays/v2_9_1/SPARSE_v2_9_1_UINT16_DATETIME_US/__schema/__1653499966512_1653499966512_8135e35bf7c9483892957c6e0bcbd86a")?;
-        let _ = read_schema(&uri)?;
+        let _ = ArraySchema::load(&uri)?;
 
         Ok(())
     }

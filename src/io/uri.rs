@@ -19,7 +19,7 @@ pub enum URIType {
     Unknown,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct URI {
     scheme: String,
     authority: String,
@@ -85,6 +85,15 @@ impl URI {
 
     pub fn path_ref(&self) -> &String {
         &self.path
+    }
+
+    pub fn path_mut_ref(&mut self) -> &mut String {
+        &mut self.path
+    }
+
+    pub fn set_path(&mut self, path: &str) -> &Self {
+        self.path = String::from(path);
+        self
     }
 
     pub fn last_path_part(&self) -> String {

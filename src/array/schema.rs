@@ -118,7 +118,7 @@ impl TryFrom<&storage::schema::DimensionLabel> for DimensionLabel {
     }
 }
 
-pub struct ArraySchema {
+pub struct Schema {
     version: u32,
     allows_dups: bool,
     array_type: ArrayType,
@@ -133,12 +133,12 @@ pub struct ArraySchema {
     enumerations: HashMap<String, String>,
 }
 
-impl TryFrom<storage::schema::ArraySchema> for ArraySchema {
+impl TryFrom<storage::ArraySchema> for Schema {
     type Error = anyhow::Error;
 
     fn try_from(
         storage: storage::schema::ArraySchema,
-    ) -> Result<ArraySchema, Self::Error> {
+    ) -> Result<Schema, Self::Error> {
         let mut attrs = Vec::new();
         for attr in storage.attributes.iter() {
             attrs.push(Attribute::try_from(attr)?);
@@ -147,7 +147,7 @@ impl TryFrom<storage::schema::ArraySchema> for ArraySchema {
         for dl in storage.dimension_labels.iter() {
             dim_labels.push(DimensionLabel::try_from(dl)?);
         }
-        Ok(ArraySchema {
+        Ok(Schema {
             version: storage.version,
             allows_dups: storage.allows_dups != 0,
             array_type: storage.array_type,

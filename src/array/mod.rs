@@ -4,6 +4,9 @@
 pub mod directory;
 pub mod schema;
 
+pub use directory::*;
+pub use schema::*;
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ArrayType {

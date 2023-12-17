@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use anyhow::anyhow;
 use binrw::binrw;
 
+use crate::array;
 use crate::io::uri;
 use crate::storage;
 use crate::Result;
@@ -158,17 +159,17 @@ struct FragmentFooter {
     tile_offsets: FragmentTileOffsets,
 }
 
-pub struct Fragment {
+pub struct FragmentMetadata {
     uri: uri::URI,
     format_version: u32,
     footer: Option<FragmentFooter>,
 }
 
-impl Fragment {
-    fn new(
+impl FragmentMetadata {
+    pub fn load(
         uri: &uri::URI,
-        schemas: HashMap<String, storage::ArraySchema>,
-    ) -> Result<Fragment> {
+        schemas: &HashMap<String, array::Schema>,
+    ) -> Result<FragmentMetadata> {
         let name = uri.remove_trailing_slash().last_path_part();
         let vsn = get_fragment_version(&name)?;
 
@@ -179,7 +180,7 @@ impl Fragment {
         //     //Fragment::load_v3_or_newer(uri, vsn, schemas)
         // }
 
-        Ok(Fragment {
+        Ok(FragmentMetadata {
             uri: uri.clone(),
             format_version: vsn,
             footer: None,
